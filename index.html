@@ -188,7 +188,7 @@ var qs="",qtab="list",qopen=false,qf={},qmulti=false,pdfUrl=null,pdfId=null;
 function fd(d){if(!d)return"-";var p=String(d).split("-");return p.length==3?esc(p[2]+"/"+p[1]+"/"+p[0]):esc(d)}
 function pk(q){return String(q.code||q.model||q.desc).trim().toLowerCase()}
 function fm(n){return Number(n).toLocaleString("en-US",{maximumFractionDigits:2})}
-function qmatch(q){var t=qs.trim().toLowerCase();return!t||[q.code,q.model,q.desc,q.sup].join(" ").toLowerCase().indexOf(t)>=0}
+function qmatch(q){var t=qs.trim().toLowerCase();return!t||[q.code,q.model,q.desc,q.sup,q.std].join(" ").toLowerCase().indexOf(t)>=0}
 function delta(c,p){if(!p)return'<span class="mut">ครั้งแรก</span>';if(c.cur!=p.cur)return'<span class="mut">คนละสกุลเงิน</span>';var d=c.price-p.price;if(!d)return'<span class="mut">เท่าเดิม</span>';return'<span style="color:'+(d>0?"#e5484d":"#1fb58a")+';font-weight:600">'+(d>0?"▲ +":"▼ ")+fm(d)+" ("+(d>0?"+":"")+(p.price?d/p.price*100:0).toFixed(1)+"%)</span>"}
 function lbl(q){return esc([q.code,q.model].filter(Boolean).join(" / "))+(q.desc?' <span class="mut">'+esc(q.desc)+"</span>":"")}
 function groups(){var g={};D.quotes.forEach(function(q,i){var s=q.sup||"-",k=pk(q);g[s]=g[s]||{};var o=g[s][k]=g[s][k]||{qs:[]};o.qs.push({q:q,i:i})});
@@ -203,29 +203,29 @@ async function dlPdf(){var q=D.quotes.filter(function(x){return(x.fid||x.id)==pd
 if(!dl||!q){alert("ดาวน์โหลดไม่ได้ในเวอร์ชันนี้");return}try{await dl.save({filename:q.pdf,data:await getF(pdfId)})}catch(e){}}
 function newQ(){qf={date:today(),cur:"THB"};qopen=true;go("quo")}
 function editQ(i){qf=JSON.parse(JSON.stringify(D.quotes[i]));qf.i=i;qopen=true;go("quo")}
-async function saveQ(){var g=function(k){return document.getElementById(k).value.trim()},q={sup:g("qsu"),code:g("qc"),model:g("qm"),desc:g("qd"),unit:g("qu"),price:parseFloat(g("qp")),cur:g("qcur"),date:g("qdt"),ref:g("qr"),note:g("qn"),valid:g("qv")};
+async function saveQ(){var g=function(k){return document.getElementById(k).value.trim()},q={sup:g("qsu"),code:g("qc"),model:g("qm"),desc:g("qd"),unit:g("qu"),price:parseFloat(g("qp")),cur:g("qcur"),date:g("qdt"),ref:g("qr"),note:g("qn"),valid:g("qv"),std:g("qstd")};
 if(!q.sup||!(q.code||q.model||q.desc)||isNaN(q.price)||!q.date){alert("กรุณาระบุ Supplier, สินค้า (Item Code/Model/Description), ราคา และวันที่");return}
 q.id=qf.id||"Q"+Date.now();q.pdf=qf.pdf||"";if(qf.fid)q.fid=qf.fid;q.prs=qf.prs||[];if(qf.hash)q.hash=qf.hash;var f=document.getElementById("qfile").files[0];
 if(f){try{delete q.fid;delete q.hash;await putF(q.id,f);q.pdf=f.name}catch(e){alert("บันทึกไฟล์ PDF ไม่ได้ (บันทึกข้อมูลใบเสนอราคาแล้ว)")}}
 if(qf.i!==undefined)D.quotes[qf.i]=q;else D.quotes.push(q);save();qopen=false;qf={};go("quo")}
 function delQ(i){if(!confirm("ลบใบเสนอราคานี้?"))return;var fk=D.quotes[i].fid||D.quotes[i].id;if(!D.quotes.some(function(z,k){return k!=i&&(z.fid||z.id)==fk}))delF(fk);D.quotes.splice(i,1);save();go("quo")}
 async function expQ(){var dl=null;try{dl=await claude.use("downloads")}catch(e){}if(!dl){alert("ดาวน์โหลดไม่ได้ในเวอร์ชันนี้");return}
-var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(D.quotes.map(function(q){return{"Supplier":q.sup,"Item Code":q.code,"Model":q.model,"Description":q.desc,"Unit":q.unit,"Unit Price":q.price,"Currency":q.cur,"Quotation Date":q.date,"Quotation Ref":q.ref,"Note":q.note,"PDF":q.pdf,"Valid Until":q.valid||"","Linked PR":(q.prs||[]).join(", ")}})),"Quotations");
+var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(D.quotes.map(function(q){return{"Supplier":q.sup,"Item Code":q.code,"Model":q.model,"Description":q.desc,"Unit":q.unit,"Unit Price":q.price,"Currency":q.cur,"Quotation Date":q.date,"Quotation Ref":q.ref,"Note":q.note,"สินค้ากลาง":q.std||"","PDF":q.pdf,"Valid Until":q.valid||"","Linked PR":(q.prs||[]).join(", ")}})),"Quotations");
 try{await dl.save({filename:"quotations-"+today()+".xlsx",data:new Blob([XLSX.write(wb,{type:"array",bookType:"xlsx"})])})}catch(e){}}
 function qform(){var v=function(k){return esc(qf[k]==null?"":qf[k])},sups=Object.keys(D.quotes.reduce(function(a,q){a[q.sup]=1;return a},{}));
-return'<div class="box"><h3>'+(qf.i!==undefined?"แก้ไขใบเสนอราคา":"เพิ่มใบเสนอราคา")+'</h3><datalist id="sl">'+sups.map(function(s){return'<option value="'+esc(s)+'">'}).join("")+'</datalist><div class="row"><input id="qsu" list="sl" placeholder="Supplier" value="'+v("sup")+'"><input id="qc" placeholder="Item Code" value="'+v("code")+'"><input id="qm" placeholder="Model" value="'+v("model")+'"><input id="qd" placeholder="Description" style="flex:1;min-width:200px" value="'+v("desc")+'"></div><div class="row"><input id="qu" placeholder="Unit" style="width:80px" value="'+v("unit")+'"><input id="qp" type="number" step="any" placeholder="Unit Price" value="'+v("price")+'"><select id="qcur"><option'+(qf.cur=="SGD"?"":" selected")+'>THB</option><option'+(qf.cur=="SGD"?" selected":"")+'>SGD</option></select><label class="mut">วันที่ใบเสนอราคา <input id="qdt" type="date" value="'+v("date")+'"></label><input id="qr" placeholder="เลขที่ใบเสนอราคา" value="'+v("ref")+'"><input id="qn" placeholder="หมายเหตุ" value="'+v("note")+'"><label class="mut">ใช้ได้ถึง <input id="qv" type="date" value="'+v("valid")+'"></label></div><div class="row"><label class="mut">PDF ต้นฉบับ <input id="qfile" type="file" accept="application/pdf,.pdf"></label>'+(qf.pdf?'<span class="mut">ไฟล์เดิม: '+esc(qf.pdf)+" (เลือกไฟล์ใหม่เพื่อแทนที่)</span>":"")+'<button class="b" onclick="saveQ()">บันทึก</button><button class="b g" onclick="qopen=false;qf={};go(\'quo\')">ยกเลิก</button></div></div>'}
+return'<div class="box"><h3>'+(qf.i!==undefined?"แก้ไขใบเสนอราคา":"เพิ่มใบเสนอราคา")+'</h3><datalist id="sl">'+sups.map(function(s){return'<option value="'+esc(s)+'">'}).join("")+'</datalist><div class="row"><input id="qsu" list="sl" placeholder="Supplier" value="'+v("sup")+'"><input id="qc" placeholder="Item Code" value="'+v("code")+'"><input id="qm" placeholder="Model" value="'+v("model")+'"><input id="qd" placeholder="Description" style="flex:1;min-width:200px" value="'+v("desc")+'"></div><div class="row"><input id="qu" placeholder="Unit" style="width:80px" value="'+v("unit")+'"><input id="qp" type="number" step="any" placeholder="Unit Price" value="'+v("price")+'"><select id="qcur"><option'+(qf.cur=="SGD"?"":" selected")+'>THB</option><option'+(qf.cur=="SGD"?" selected":"")+'>SGD</option></select><label class="mut">วันที่ใบเสนอราคา <input id="qdt" type="date" value="'+v("date")+'"></label><input id="qr" placeholder="เลขที่ใบเสนอราคา" value="'+v("ref")+'"><input id="qn" placeholder="หมายเหตุ" value="'+v("note")+'"><label class="mut">ใช้ได้ถึง <input id="qv" type="date" value="'+v("valid")+'"></label><input id="qstd" placeholder="สินค้ากลาง" value="'+v("std")+'"></div><div class="row"><label class="mut">PDF ต้นฉบับ <input id="qfile" type="file" accept="application/pdf,.pdf"></label>'+(qf.pdf?'<span class="mut">ไฟล์เดิม: '+esc(qf.pdf)+" (เลือกไฟล์ใหม่เพื่อแทนที่)</span>":"")+'<button class="b" onclick="saveQ()">บันทึก</button><button class="b g" onclick="qopen=false;qf={};go(\'quo\')">ยกเลิก</button></div></div>'}
 function qlist(){var g=groups(),ss=Object.keys(g).sort();if(!ss.length)return'<div class="box mut">ไม่พบใบเสนอราคา</div>';
 return ss.map(function(s){var ks=Object.keys(g[s]);return'<div class="box"><h3>🏢 '+esc(s)+' <span class="mut">('+ks.length+" สินค้า)</span></h3>"+ks.map(function(k){var o=g[s][k],l=o.qs[0].q;
-return'<div style="margin:12px 0 4px"><button class="b g" style="padding:2px 8px;margin-right:6px" onclick="showPH('+o.qs[0].i+')">📈 ประวัติราคา</button><b>'+lbl(l)+'</b> <span class="mut">· ล่าสุด '+fm(l.price)+" "+esc(l.cur)+" ("+fd(l.date)+')</span></div><div class="tw"><table style="min-width:700px"><tr><th>วันที่</th><th>เลขที่</th><th>ราคา/หน่วย</th><th>เทียบครั้งก่อน</th><th>ใช้ได้ถึง</th><th>PR</th><th>หมายเหตุ</th><th>PDF</th><th></th></tr>'+
-o.qs.map(function(a,n){var q=a.q;if(!inR(q))return"";return"<tr><td>"+fd(q.date)+(n==0?' <span class="tag" style="background:#4f5bd5">ล่าสุด</span>':"")+"</td><td>"+esc(q.ref)+"</td><td><b>"+fm(q.price)+"</b> "+esc(q.cur)+"</td><td>"+delta(q,o.qs[n+1]&&o.qs[n+1].q)+"</td><td>"+vTag(q)+"</td><td>"+qprCell(a.i)+"</td><td>"+esc(q.note)+"</td><td>"+pdfBtn(q)+'</td><td style="white-space:nowrap"><button class="b g" onclick="editQ('+a.i+')">แก้ไข</button> <button class="b g" onclick="delQ('+a.i+')">ลบ</button></td></tr>'}).join("")+"</table></div>"}).join("")+"</div>"}).join("")}
-function qcmp(){var g=groups(),P={};Object.keys(g).forEach(function(s){Object.keys(g[s]).forEach(function(k){var o=g[s][k],l=o.qs[0].q,mn=Math.min.apply(null,o.qs.filter(function(a){return a.q.cur==l.cur}).map(function(a){return a.q.price}));(P[k]=P[k]||[]).push({s:s,l:l,p:o.qs[1]&&o.qs[1].q,mn:mn})})});
+return'<div style="margin:12px 0 4px"><button class="b g" style="padding:2px 8px;margin-right:6px" onclick="showPH('+o.qs[0].i+')">📈 ประวัติราคา</button><b>'+lbl(l)+'</b>'+(l.std?' <span class="tag" style="background:#7c5cd6">'+esc(l.std)+"</span>":"")+' <span class="mut">· ล่าสุด '+fm(l.price)+" "+esc(l.cur)+" ("+fd(l.date)+')</span></div><div class="tw"><table style="min-width:700px"><tr><th>วันที่</th><th>เลขที่</th><th>ราคา/หน่วย</th><th>เทียบครั้งก่อน</th><th>ใช้ได้ถึง</th><th>PR</th><th>หมายเหตุ</th><th>PDF</th><th></th></tr>'+
+o.qs.map(function(a,n){var q=a.q;if(!inR(q))return"";return"<tr><td>"+fd(q.date)+(n==0?' <span class="tag" style="background:#4f5bd5">ล่าสุด</span>':"")+"</td><td>"+esc(q.ref)+"</td><td><b>"+fm(q.price)+"</b> "+esc(q.cur)+lst(q)+"</td><td>"+delta(q,o.qs[n+1]&&o.qs[n+1].q)+"</td><td>"+vTag(q)+"</td><td>"+qprCell(a.i)+"</td><td>"+esc(q.note)+"</td><td>"+pdfBtn(q)+'</td><td style="white-space:nowrap"><button class="b g" onclick="editQ('+a.i+')">แก้ไข</button> <button class="b g" onclick="delQ('+a.i+')">ลบ</button></td></tr>'}).join("")+"</table></div>"}).join("")+"</div>"}).join("")}
+function qcmp(){var g=groups(),P={};Object.keys(g).forEach(function(s){Object.keys(g[s]).forEach(function(k){var o=g[s][k],l=o.qs[0].q,mn=Math.min.apply(null,o.qs.filter(function(a){return a.q.cur==l.cur}).map(function(a){return a.q.price}));var ck2=l.std?ck(l):k;(P[ck2]=P[ck2]||[]).push({s:s,l:l,p:o.qs[1]&&o.qs[1].q,mn:mn})})});
 var ks=Object.keys(P).sort().filter(function(k){return!qmulti||P[k].length>1});if(!ks.length)return'<div class="box mut">ไม่พบข้อมูลสำหรับเปรียบเทียบ</div>';
 return ks.map(function(k){var R=P[k],best={};R.forEach(function(r){var c=r.l.cur;if(best[c]===undefined||r.l.price<best[c])best[c]=r.l.price});
-return'<div class="box"><h3>'+lbl(R[0].l)+' <span class="mut">('+R.length+' Supplier)</span></h3><div class="tw"><table style="min-width:720px"><tr><th>Supplier</th><th>ใบเสนอราคาล่าสุด</th><th>ราคา/หน่วย</th><th>เทียบครั้งก่อน</th><th>ต่ำสุดที่เคยเสนอ</th><th>เทียบราคาต่ำสุดตอนนี้</th><th>PDF</th></tr>'+
+return'<div class="box"><h3>'+(R[0].l.std?"<b>"+esc(R[0].l.std)+"</b> · ":"")+lbl(R[0].l)+' <span class="mut">('+R.length+' Supplier)</span></h3><div class="tw"><table style="min-width:720px"><tr><th>Supplier</th><th>ใบเสนอราคาล่าสุด</th><th>ราคา/หน่วย</th><th>เทียบครั้งก่อน</th><th>ต่ำสุดที่เคยเสนอ</th><th>เทียบราคาต่ำสุดตอนนี้</th><th>PDF</th></tr>'+
 R.sort(function(a,b){return a.l.cur==b.l.cur?a.l.price-b.l.price:a.l.cur<b.l.cur?-1:1}).map(function(r){var c=r.l.cur,b=best[c],cnt=R.filter(function(x){return x.l.cur==c}).length,df=cnt<2?'<span class="mut">-</span>':r.l.price==b?'<span class="tag" style="background:#1fb58a">ถูกที่สุด</span>':'<span style="color:#e5484d">+'+((r.l.price-b)/b*100).toFixed(1)+"%</span>";
-return"<tr><td>"+esc(r.s)+"</td><td>"+fd(r.l.date)+"</td><td><b>"+fm(r.l.price)+"</b> "+esc(c)+"</td><td>"+delta(r.l,r.p)+"</td><td>"+fm(r.mn)+" "+esc(c)+"</td><td>"+df+"</td><td>"+pdfBtn(r.l)+"</td></tr>"}).join("")+"</table></div>"+(new Set(R.map(function(r){return r.l.cur})).size>1?'<p class="mut">มีหลายสกุลเงิน: เปรียบเทียบเฉพาะสกุลเงินเดียวกัน</p>':"")+"</div>"}).join("")}
+return"<tr><td>"+esc(r.s)+'<br><span class="mut">'+esc(r.l.code||r.l.model)+"</span></td><td>"+fd(r.l.date)+"</td><td><b>"+fm(r.l.price)+"</b> "+esc(c)+"</td><td>"+delta(r.l,r.p)+"</td><td>"+fm(r.mn)+" "+esc(c)+"</td><td>"+df+"</td><td>"+pdfBtn(r.l)+"</td></tr>"}).join("")+"</table></div>"+(new Set(R.map(function(r){return r.l.cur})).size>1?'<p class="mut">มีหลายสกุลเงิน: เปรียบเทียบเฉพาะสกุลเงินเดียวกัน</p>':"")+"</div>"}).join("")}
 V.quo=function(){var h=head("Supplier Quotation","จัดเก็บและค้นหาใบเสนอราคาจาก Supplier เรียงตามวันที่ ล่าสุดอยู่บน");
-h+='<div class="row"><input id="qs" placeholder="ค้นหา Item Code, Model, Description หรือ Supplier" style="flex:1;min-width:240px" value="'+esc(qs)+'" oninput="qs=this.value;go(\'quo\');var e=document.getElementById(\'qs\');e.focus();e.setSelectionRange(e.value.length,e.value.length)"><'+qfilt()+'<button class="b" onclick="newQ()">+ เพิ่มใบเสนอราคา</button><button class="b g" onclick="expQ()">Export Excel</button></div>';
+h+='<div class="row"><input id="qs" placeholder="ค้นหา Item Code, Model, Description หรือ Supplier" style="flex:1;min-width:240px" value="'+esc(qs)+'" oninput="qs=this.value;go(\'quo\');var e=document.getElementById(\'qs\');e.focus();e.setSelectionRange(e.value.length,e.value.length)"><'+qfilt()+'<button class="b" onclick="newQ()">+ เพิ่มใบเสนอราคา</button><button class="b g" onclick="autoStdAll()">จัดกลุ่มสินค้ากลางตามขนาด</button><button class="b g" onclick="expQ()">Export Excel</button></div>';
 h+=upBox();h+=alertBox();if(qopen)h+=qform();h+=phBox();
 if(pdfUrl){var q=D.quotes.filter(function(x){return(x.fid||x.id)==pdfId})[0]||{};h+='<div class="box"><div class="row" style="justify-content:space-between"><h3 style="margin:0">PDF: '+esc(q.pdf||"")+'</h3><span><button class="b" onclick="dlPdf()">ดาวน์โหลด PDF</button> <button class="b g" onclick="URL.revokeObjectURL(pdfUrl);pdfUrl=null;go(\'quo\')">ปิด</button></span></div><iframe src="'+pdfUrl+'" style="width:100%;height:560px;border:1px solid var(--bd);border-radius:8px;margin-top:10px"></iframe></div>'}
 h+='<div class="row"><button class="b'+(qtab=="list"?"":" g")+'" onclick="qtab=\'list\';go(\'quo\')">Supplier › Product › Quotation</button><button class="b'+(qtab=="cmp"?"":" g")+'" onclick="qtab=\'cmp\';go(\'quo\')">เปรียบเทียบราคา</button>'+(qtab=="cmp"?'<label class="mut"><input type="checkbox"'+(qmulti?" checked":"")+' onchange="qmulti=this.checked;go(\'quo\')"> เฉพาะสินค้าที่มีหลาย Supplier</label>':"")+"</div>";
@@ -251,8 +251,8 @@ var t=await pdfText(f),text=t.text.trim(),imgs=[],ai=null,src="regex";
 try{if(text.length<80)imgs=await pageImgs(t.doc,3);ai=await aiRead(text,imgs)}catch(e){ai=null}
 var h,items;
 if(ai&&ai.items){src="ai";h={sup:ai.supplier||"",ref:ai.quotation_no||"",date:fixDate(ai.date),cur:ai.currency||"THB",valid:vcalc(ai)};items=ai.items.map(function(i){return{code:i.item_code||"",model:i.model||"",desc:i.description||"",unit:i.unit||"",qty:i.qty||"",price:i.unit_price||""}})}
-else{h=rxRead(text);items=[{code:"",model:"",desc:"",unit:"",qty:"",price:""}]}
-dr={file:f,hdr:h,items:items,src:src,note:src=="ai"?"อ่านข้อมูลด้วย AI แล้ว กรุณาตรวจสอบความถูกต้องทุกช่องก่อนบันทึก":(text.length<80?"PDF เป็นภาพสแกนและไม่สามารถใช้ AI อ่านได้ในเวอร์ชันนี้ กรุณากรอกข้อมูลเอง":"อ่านได้เฉพาะเลขที่/วันที่/สกุลเงินโดยประมาณ (ไม่สามารถใช้ AI ได้ในเวอร์ชันนี้) กรุณากรอกรายการสินค้าเอง")};
+else{h=rxRead(text);items=rxItems(text);if(!items.length)items=[{code:"",model:"",desc:"",unit:"",qty:"",price:""}]}
+dr={file:f,hdr:h,items:items,src:src,note:src=="ai"?"อ่านข้อมูลด้วย AI แล้ว กรุณาตรวจสอบความถูกต้องทุกช่องก่อนบันทึก":(items.length&&items[0].code?"อ่านหัวเอกสารและรายการสินค้าได้ "+items.length+" รายการ กรุณาตรวจสอบกับ PDF ต้นฉบับก่อนบันทึก":text.length<80?"PDF เป็นภาพสแกนและไม่สามารถใช้ AI อ่านได้ในเวอร์ชันนี้ กรุณากรอกข้อมูลเอง":"อ่านได้เฉพาะเลขที่/วันที่/สกุลเงินโดยประมาณ (ไม่สามารถใช้ AI ได้ในเวอร์ชันนี้) กรุณากรอกรายการสินค้าเอง")};
 dr.hash=await sha(f);dupMsg();matchAll();rd=""}catch(e){rd="";dr={file:f,hdr:{sup:"",ref:"",date:"",cur:"THB"},items:[{code:"",model:"",desc:"",unit:"",qty:"",price:""}],src:"manual",note:"อ่าน PDF ไม่สำเร็จ กรุณากรอกข้อมูลเอง"}}
 go("quo")}
 document.addEventListener("change",function(e){if(e.target.id=="pdfin"&&e.target.files[0])readPdf(e.target.files[0])});
@@ -277,14 +277,14 @@ async function saveDr(){var h=dr.hdr,its=dr.items.filter(function(i){return i.co
 if(!h.sup.trim()||!h.date||!its.length||its.some(function(i){return isNaN(parseFloat(i.price))||!(i.code||i.model||i.desc)})){alert("กรุณาตรวจสอบ: Supplier, วันที่ และรายการสินค้าทุกแถวต้องมีสินค้า (Code/Model/Description) กับราคา");return}
 if(h.ref&&D.quotes.some(function(q){return supKey(q.sup)==supKey(h.sup)&&q.ref&&q.ref==h.ref})&&!confirm("ใบเสนอราคาเลขที่ "+h.ref+" ของ Supplier นี้เคยบันทึกแล้ว ต้องการบันทึกซ้ำหรือไม่?"))return;
 if(dr.fdup&&!confirm("ไฟล์ PDF นี้เคยอัปโหลดแล้ว ต้องการบันทึกซ้ำหรือไม่?"))return;var fid="F"+Date.now();try{await putF(fid,dr.file)}catch(e){alert("บันทึกไฟล์ PDF ไม่ได้ (จะบันทึกเฉพาะข้อมูลราคา)")}
-its.forEach(function(i,n){D.quotes.push({id:"Q"+Date.now()+"_"+n,fid:fid,sup:h.sup.trim(),code:i.code.trim(),model:i.model.trim(),desc:i.desc.trim(),unit:i.unit,qty:i.qty,price:parseFloat(i.price),cur:h.cur||"THB",date:h.date,ref:h.ref,note:"",pdf:dr.file.name,valid:h.valid||"",prs:(dr.prs||[]).slice(),hash:dr.hash||""})});
+its.forEach(function(i,n){D.quotes.push({id:"Q"+Date.now()+"_"+n,fid:fid,sup:h.sup.trim(),code:i.code.trim(),model:i.model.trim(),desc:i.desc.trim(),unit:i.unit,qty:i.qty,std:(i.std||"").trim(),list:i.list||"",disc:i.disc||"",total:i.total||"",price:parseFloat(i.price),cur:h.cur||"THB",date:h.date,ref:h.ref,note:"",pdf:dr.file.name,valid:h.valid||"",prs:(dr.prs||[]).slice(),hash:dr.hash||""})});
 save();dr=null;go("quo")}
 function stepBar(a){return'<div class="row" style="gap:6px">'+["1 Upload PDF","2 อ่านข้อมูล","3 ตรวจสอบ/ยืนยัน","4 จัดกลุ่ม/จับคู่","5 บันทึก"].map(function(t,i){return'<span class="tag" style="background:'+(i+1<=a?"#4f5bd5":"#8f9ac0")+'">'+t+"</span>"}).join("")+"</div>"}
-function upBox(){var s='<div class="box"><div class="row"><label style="display:inline-block;background:var(--pri);color:#fff;border-radius:8px;padding:7px 12px;cursor:pointer">⬆ Upload PDF ใบเสนอราคา<input id="pdfin" type="file" accept="application/pdf,.pdf" style="display:none"></label><span class="mut">ระบบอ่านเลขที่ วันที่ สกุลเงิน และวันหมดอายุจาก PDF ที่เป็นข้อความให้ ส่วนรายการสินค้ากรอกเอง แล้วตรวจสอบก่อนบันทึก</span></div>';
+function upBox(){var s='<div class="box"><div class="row"><label style="display:inline-block;background:var(--pri);color:#fff;border-radius:8px;padding:7px 12px;cursor:pointer">⬆ Upload PDF ใบเสนอราคา<input id="pdfin" type="file" accept="application/pdf,.pdf" style="display:none"></label><span class="mut">ระบบอ่านเลขที่ วันที่ สกุลเงิน และวันหมดอายุจาก PDF ที่เป็นข้อความให้ และรายการสินค้าของใบเสนอราคารูปแบบ Camfil (Supplier อื่นอาจต้องกรอกเอง) แล้วตรวจสอบก่อนบันทึก</span></div>';
 if(rd)s+=stepBar(2)+'<p>'+esc(rd)+"</p>";
 if(dr){var h=dr.hdr,hv=function(k){return esc(h[k]||"")};
 s+=stepBar(3)+'<p class="mut">'+esc(dr.note)+(dr.smsg?" · "+esc(dr.smsg):"")+'</p><div class="row"><input placeholder="Supplier" list="sl2" value="'+hv("sup")+'" oninput="drIn(\'sup\',this.value)"><datalist id="sl2">'+Object.keys(D.quotes.reduce(function(a,q){a[q.sup]=1;return a},{})).map(function(x){return'<option value="'+esc(x)+'">'}).join("")+'</datalist><input placeholder="เลขที่ใบเสนอราคา" value="'+hv("ref")+'" oninput="drIn(\'ref\',this.value)"><input type="date" value="'+hv("date")+'" onchange="drIn(\'date\',this.value)"><input placeholder="สกุลเงิน" list="cl" style="width:90px" value="'+hv("cur")+'" oninput="drIn(\'cur\',this.value.toUpperCase())"><datalist id="cl"><option value="THB"><option value="SGD"></datalist>'+drExtra()+'<button class="b g" onclick="drPrev()">ดู PDF ต้นฉบับ</button></div>'+
-'<div class="tw"><table style="min-width:980px"><tr><th>Item Code</th><th>Model</th><th>Description</th><th>Unit</th><th>Qty</th><th>ราคา/หน่วย</th><th>จับคู่ประวัติสินค้า</th><th></th></tr>'+dr.items.map(function(it,i){function f(k,w){return'<td><input value="'+esc(it[k])+'" style="width:'+w+'" oninput="drRow('+i+",\'"+k+"\',this.value)\"></td>"}return"<tr>"+f("code","105px")+f("model","95px")+f("desc","220px")+f("unit","55px")+f("qty","60px")+f("price","90px")+"<td>"+hint(it)+'</td><td><button class="b g" onclick="drDel('+i+')">ลบ</button></td></tr>'}).join("")+'</table></div><div class="row" style="margin-top:10px"><button class="b g" onclick="drAdd()">+ เพิ่มแถว</button><button class="b g" onclick="matchAll();go(\'quo\')">จับคู่กับประวัติอีกครั้ง</button><button class="b" onclick="saveDr()">บันทึก PDF และข้อมูลราคา</button><button class="b g" onclick="dr=null;go(\'quo\')">ยกเลิก</button></div>'}
+drTable()+'<div class="row" style="margin-top:10px"><button class="b g" onclick="drAdd()">+ เพิ่มแถว</button><button class="b g" onclick="matchAll();go(\'quo\')">จับคู่กับประวัติอีกครั้ง</button><button class="b" onclick="saveDr()">บันทึก PDF และข้อมูลราคา</button><button class="b g" onclick="dr=null;go(\'quo\')">ยกเลิก</button></div>'}
 return s+"</div>"}
 D.quotes.forEach(function(q){q.prs=q.prs||[]});
 var qsup="",qd1="",qd2="",qwarn=14,ph=null;
@@ -292,14 +292,14 @@ function addDays(d,n){var t=new Date(d);t.setUTCDate(t.getUTCDate()+n);return t.
 function vcalc(a){var d=fixDate(a.date);return fixDate(a.valid_until)||(a.validity_days&&d?addDays(d,+a.validity_days):"")}
 function dd(d){return Math.round((new Date(d)-new Date(today()))/864e5)}
 function inR(q){return(!qd1||q.date>=qd1)&&(!qd2||q.date<=qd2)}
-function qmatch(q){var t=qs.trim().toLowerCase();return(!t||[q.code,q.model,q.desc,q.sup].join(" ").toLowerCase().indexOf(t)>=0)&&(!qsup||q.sup==qsup)&&inR(q)}
+function qmatch(q){var t=qs.trim().toLowerCase();return(!t||[q.code,q.model,q.desc,q.sup,q.std].join(" ").toLowerCase().indexOf(t)>=0)&&(!qsup||q.sup==qsup)&&inR(q)}
 function vTag(q){if(!q.valid)return'<span class="mut">-</span>';var n=dd(q.valid);return n<0?'<span class="tag" style="background:#e5484d">หมดอายุแล้ว</span><br>'+fd(q.valid):n<=qwarn?'<span class="tag" style="background:#f59e0b">เหลือ '+n+" วัน</span><br>"+fd(q.valid):fd(q.valid)}
 function expList(){var L={};D.quotes.forEach(function(q){var k=q.sup+"|"+pk(q);if(!L[k]||q.date>L[k].date)L[k]=q});return Object.keys(L).map(function(k){return L[k]}).filter(function(q){return q.valid&&dd(q.valid)<=qwarn}).sort(function(a,b){return a.valid<b.valid?-1:1})}
 function alertBox(){var E=expList();if(!E.length)return"";
 return'<div class="box" style="border-color:#f59e0b"><div class="row" style="justify-content:space-between"><h3 style="margin:0">⚠ ใบเสนอราคาใกล้หมดอายุ / หมดอายุแล้ว ('+E.length+')</h3><label class="mut">แจ้งเตือนล่วงหน้า <select onchange="qwarn=+this.value;go(\'quo\')">'+[7,14,30,60].map(function(n){return"<option"+(n==qwarn?" selected":"")+' value="'+n+'">'+n+" วัน</option>"}).join("")+'</select></label></div><div class="tw"><table style="min-width:600px"><tr><th>Supplier</th><th>สินค้า</th><th>ราคา</th><th>ใช้ได้ถึง</th><th>PDF</th></tr>'+E.map(function(q){return"<tr><td>"+esc(q.sup)+"</td><td>"+lbl(q)+"</td><td>"+fm(q.price)+" "+esc(q.cur)+"</td><td>"+vTag(q)+"</td><td>"+pdfBtn(q)+"</td></tr>"}).join("")+"</table></div><p class=\"mut\">แจ้งเตือนเฉพาะใบเสนอราคาล่าสุดของแต่ละสินค้าจาก Supplier นั้น</p></div>"}
 function qfilt(){return'<select onchange="qsup=this.value;go(\'quo\')"><option value="">ทุก Supplier</option>'+Object.keys(D.quotes.reduce(function(a,q){a[q.sup]=1;return a},{})).sort().map(function(s){return'<option'+(s==qsup?" selected":"")+' value="'+esc(s)+'">'+esc(s)+"</option>"}).join("")+'</select><label class="mut">ตั้งแต่ <input type="date" value="'+qd1+'" onchange="qd1=this.value;go(\'quo\')"></label><label class="mut">ถึง <input type="date" value="'+qd2+'" onchange="qd2=this.value;go(\'quo\')"></label><button class="b g" onclick="qs=\'\';qsup=\'\';qd1=\'\';qd2=\'\';go(\'quo\')">ล้างตัวกรอง</button>'}
-function showPH(i){ph={k:pk(D.quotes[i]),cur:D.quotes[i].cur};go("quo")}
-function phBox(){if(!ph)return"";var Q=D.quotes.filter(function(q){return pk(q)==ph.k&&q.cur==ph.cur}).sort(function(a,b){return a.date<b.date?-1:1});if(!Q.length)return"";
+function showPH(i){ph={k:ck(D.quotes[i]),cur:D.quotes[i].cur};go("quo")}
+function phBox(){if(!ph)return"";var Q=D.quotes.filter(function(q){return ck(q)==ph.k&&q.cur==ph.cur}).sort(function(a,b){return a.date<b.date?-1:1});if(!Q.length)return"";
 var W=700,H=240,L=62,R=16,T=16,B=34,ts=Q.map(function(q){return+new Date(q.date)}),t0=Math.min.apply(0,ts),t1=Math.max.apply(0,ts),ps=Q.map(function(q){return q.price}),m0=Math.min.apply(0,ps),m1=Math.max.apply(0,ps),p0=m0,p1=m1;
 if(p1==p0){p1+=1;p0-=1}var pd=(p1-p0)*.12;p0-=pd;p1+=pd;if(t1==t0){t1+=864e5;t0-=864e5}
 var X=function(t){return L+(t-t0)/(t1-t0)*(W-L-R)},Y=function(p){return T+(p1-p)/(p1-p0)*(H-T-B)},S={};Q.forEach(function(q){(S[q.sup]=S[q.sup]||[]).push(q)});
@@ -364,5 +364,79 @@ if(!API||API.indexOf("PASTE")==0){v.innerHTML='<div class="box"><h3>ยังไ
 var t=ls("wpts_tok"),nm=ls("wpts_name");if(!t||!nm){askGate("");return}
 TOKEN=t;USER={name:nm};v.innerHTML='<p class="mut">กำลังโหลดข้อมูล...</p>';
 try{await startApp()}catch(e){TOKEN="";if(e.message=="unauthorized")askGate("เซสชันหมดอายุหรือมีการเปลี่ยนรหัส กรุณาใส่รหัสทีมอีกครั้ง");else v.innerHTML='<div class="box"><h3>เชื่อมต่อไม่สำเร็จ</h3><p>'+esc(e.message)+'</p><button class="b" onclick="boot()">ลองใหม่</button></div>'}}
+/* ===== อ่านใบเสนอราคาแบบตาราง (No. / Item Id / Item Name / Qty / Unit Price / Discount / Unit Price After Discount / Line Amount After Discount) ===== */
+function d2i(d,m,y){y=+y;if(y>2400)y-=543;return y+"-"+("0"+m).slice(-2)+"-"+("0"+d).slice(-2)}
+function cleanName(s){return s.replace(/\s+-\s+/g,"-").replace(/\/\s+/g,"/").replace(/\s+;/g,";").replace(/\s+/g," ").trim()}
+function rxSup(text){var L=text.split("\n"),RS=/([A-Z][A-Za-z0-9&.,'()\- ]*?(?:Limited|Ltd\.?|Co\.,?\s?Ltd\.?|Pte\.?\s?Ltd\.?))(?=\s|$)/i;
+for(var i=0;i<L.length;i++){var m=L[i].match(RS);if(!m||/esco/i.test(m[1])||(i>0&&/esco/i.test(L[i-1]))||/^(total|sub)/i.test(m[1]))continue;return m[1].replace(/\s+/g," ").trim()}return""}
+var MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function rxRead(text){var h={sup:rxSup(text),ref:"",date:"",cur:"",valid:""},m=text.match(/QT\s*Number\s*[:：]?\s*([A-Z0-9\-\/]+)/i);
+if(m)h.ref=m[1];else{m=text.match(/quotation\s*no\.?\s*[:：]?\s*([^\n]+)/i);if(m){var r=m[1].replace(/\s+/g,"").replace(/[^A-Za-z0-9\-\/_.]/g,"");if(r.length>=3)h.ref=r}}
+m=text.match(/quotation\s*date\s*[:：]?\s*(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{4})/i);
+if(m)h.date=d2i(m[1],m[2],m[3]);
+else if((m=text.match(/\bDate\s*[:：]\s*(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/))&&MON[m[2].slice(0,3).toLowerCase()])h.date=d2i(m[1],MON[m[2].slice(0,3).toLowerCase()],m[3]);
+else{m=text.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)h.date=m[0];else{m=text.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{4})/);if(m)h.date=d2i(m[1],m[2],m[3])}}
+var cm=text.match(/Currency\s*[:：]?\s*([A-Z]{3})\b/);h.cur=cm?cm[1]:(/SGD|S\$/.test(text)?"SGD":"THB");
+var L=text.split("\n"),DR=/(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})/g;
+for(var i=0;i<L.length;i++){if(!/validity\s*date/i.test(L[i]))continue;
+var same=L[i].match(/validity\s*date\s*[:：]?\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})/i);if(same){h.valid=d2i(same[1],same[2],same[3]);break}
+for(var j=i+1;j<Math.min(L.length,i+5);j++){var ds=[],x;DR.lastIndex=0;while((x=DR.exec(L[j])))ds.push(x);
+if(ds.length){var k=(/effective/i.test(L[i])&&ds.length>=2)?1:0;h.valid=d2i(ds[k][1],ds[k][2],ds[k][3]);break}}
+break}
+if(!h.valid){var vm=text.match(/valid(?:ity)?[^0-9\n]{0,25}(\d{1,3})\s*days/i);if(vm&&h.date)h.valid=addDays(h.date,+vm[1])}
+return h}
+function rxItemsCamfil(text){var L=text.split("\n"),out=[],cur=null,
+RX=/^\s*(\d+)\.\s+(\d{6,})\s+(?:\d\s+)?(.+?)\s+(\d+(?:\.\d+)?)\s+[฿B]?\s*([\d,]+\.\d{2})\s+(?:([\d.]+)\s*)?%\s+([\d,]+\.\d{2})\s+[฿B]?\s*([\d,]+\.\d{2})\s*$/,mn=function(s){return String(s).replace(/,/g,"")};
+for(var i=0;i<L.length;i++){var ln=L[i];if(/sub\s*total/i.test(ln)){if(out.length)break;continue}
+var m=ln.match(RX);
+if(m){cur={code:m[2],model:"",desc:cleanName(m[3]),unit:"",qty:m[4],list:mn(m[5]),disc:m[6]||"",price:mn(m[7]),total:mn(m[8])};out.push(cur)}
+else if(cur){var t=ln.replace(/^\s*\.\s*/,"").replace(/\s+\.\s*$/,"").trim();if(t&&t!==".")cur.desc=cleanName(cur.desc+" "+t)}}
+return out}
+function rxItemsAAF(text){var L=text.split("\n"),out=[],cur=null,started=false,mn=function(x){return String(x).replace(/,/g,"")},
+RX=/^\s*(\d{1,3})\s+(.+?)\s+(\d+(?:\.\d+)?)\s+([A-Za-z]{1,6})\s+([\d,]+\.\d{2})\s+(?:(\d+(?:\.\d+)?)\s+)?([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+for(var i=0;i<L.length;i++){var ln=L[i];if(!started){if(/Item\s+Description\s+QTY/i.test(ln))started=true;continue}
+if(/^\s*(remark|total|discount|grand total)\b/i.test(ln))break;
+var m=ln.match(RX);
+if(m){cur={code:cleanName(m[2]),model:"",desc:"",unit:m[4],qty:m[3],list:mn(m[5]),disc:m[6]||"",price:mn(m[7]),total:mn(m[8])};out.push(cur)}
+else if(cur){var t=ln.trim();if(t&&cur.desc.length<200)cur.desc=cleanName(cur.desc?cur.desc+"; "+t:t)}}
+return out}
+function rxItems(text){var a=rxItemsCamfil(text);return a.length?a:rxItemsAAF(text)}
+function lst(q){var l=parseFloat(String(q.list||"").replace(/,/g,""));return l&&l!=q.price?' <span class="mut">(ราคาตั้ง '+fm(l)+(q.disc?", ลด "+esc(q.disc)+"%":"")+")</span>":""}
+function drRow(i,k,v){var it=dr.items[i];it[k]=v;var n=function(x){return parseFloat(String(x).replace(/,/g,""))};
+if(k=="list"||k=="disc"){var l=n(it.list);if(!isNaN(l)){it.price=String(Math.round(l*(1-(n(it.disc)||0)/100)*100)/100);var e=document.getElementById("dp"+i);if(e)e.value=it.price}}
+if(k=="list"||k=="disc"||k=="price"||k=="qty"){var p=n(it.price),q=n(it.qty);if(!isNaN(p)&&!isNaN(q)){it.total=String(Math.round(p*q*100)/100);var t=document.getElementById("dt"+i);if(t)t.value=it.total}}}
+function drTable(){var cols=["No.","Item Id","Item Name","สินค้ากลาง (เทียบข้าม Supplier)","Qty","Unit Price","Discount (%)","Unit Price After Discount","Line Amount After Discount","จับคู่ประวัติสินค้า",""];
+var pool={};D.quotes.concat(dr.items).forEach(function(q){if(q.std)pool[q.std]=1});return'<datalist id="stdl">'+Object.keys(pool).map(function(x){return'<option value="'+esc(x)+'">'}).join("")+'</datalist><div class="tw"><table style="min-width:1320px"><tr>'+cols.map(function(c){return"<th>"+c+"</th>"}).join("")+"</tr>"+dr.items.map(function(it,i){function f(k,w,id){return"<td><input"+(id?' id="'+id+i+'"':"")+(k=="std"?' list="stdl"':"")+' value="'+esc(it[k])+'" style="width:'+w+'" oninput="drRow('+i+",\'"+k+"\',this.value)\"></td>"}
+return"<tr><td>"+(i+1)+"</td>"+f("code","105px")+f("desc","240px")+f("std","150px")+f("qty","60px")+f("list","90px")+f("disc","60px")+f("price","110px","dp")+f("total","110px","dt")+"<td>"+hint(it)+'</td><td><button class="b g" onclick="drDel('+i+')">ลบ</button></td></tr>'}).join("")+"</table></div>"}
+/* ===== สินค้ากลาง (เทียบข้าม Supplier) ===== */
+function ck(q){return q.std?"std:"+norm(q.std):pk(q)}
+function dimsOf(t){var s=String(t||""),R=/(\d{2,4})\s*[x×]\s*(\d{2,4})(?:\s*[x×]\s*(\d{2,4}))?/gi,m,best=null;
+while((m=R.exec(s))){var d=[+m[1],+m[2]].concat(m[3]?[+m[3]]:[]);if(!best||d.length>best.length)best=d;if(best.length==3)break}
+return best?best.slice().sort(function(a,b){return b-a}):null}
+function gradeOf(t){var m=String(t||"").match(/\b([HU]1[0-7])\b/i);return m?m[1].toUpperCase():""}
+function parseStd(s){var m=String(s||"").match(/^(\d+)x(\d+)x(\d+)(?:\s+(\S+))?$/);return m?{d:[+m[1],+m[2],+m[3]],g:m[4]||""}:null}
+function suggestStd(it,pool){var tx=(it.desc||"")+" "+(it.code||""),d=dimsOf(tx);if(!d||d.length<3)return"";var g=gradeOf(tx);
+for(var i=0;i<pool.length;i++){var p=parseStd(pool[i]);if(p&&p.d.every(function(v,k){return Math.abs(v-d[k])<=3})&&(!p.g||!g||p.g==g))return pool[i]}
+return d.join("x")+(g?" "+g:"")}
+function matchAll(){var h=dr.hdr,sk=supKey(h.sup);dr.smsg="";
+if(sk.length>=3){var ex={};D.quotes.forEach(function(q){ex[q.sup]=1});Object.keys(ex).some(function(s){var k=supKey(s);if(k&&(k==sk||(k.length>=5&&(k.indexOf(sk)>=0||sk.indexOf(k)>=0)))){if(s!=h.sup)dr.smsg="จับคู่กับ Supplier เดิม: "+s;h.sup=s;return true}})}
+var pool=[];D.quotes.forEach(function(q){if(q.std&&pool.indexOf(q.std)<0)pool.push(q.std)});
+dr.items.forEach(function(it){var m=hit(it);it.m=m;if(m){if(!it.code&&m.q.code)it.code=m.q.code;if(!it.model&&m.q.model)it.model=m.q.model;if(!it.std&&m.q.std)it.std=m.q.std}
+if(!it.std){it.std=suggestStd(it,pool);if(it.std&&pool.indexOf(it.std)<0)pool.push(it.std)}})}
+function hint(it){var m=it.m,st=(it.std||"").trim(),ds=supKey(dr.hdr.sup),cur=dr.hdr.cur||"THB",pr=parseFloat(it.price);
+var same=function(q){return(m&&pk(q)==pk(m.q))||(st&&norm(q.std)==norm(st))};
+var mine=D.quotes.filter(function(q){return same(q)&&supKey(q.sup)==ds}).sort(function(a,b){return a.date<b.date?1:-1})[0],L={};
+D.quotes.forEach(function(q){if(!same(q)||supKey(q.sup)==ds||q.cur!=cur)return;var k=supKey(q.sup);if(!L[k]||q.date>L[k].date)L[k]=q});
+var oth=Object.keys(L).map(function(k){return L[k]}).sort(function(a,b){return a.price-b.price})[0];
+if(!m&&!mine&&!oth)return'<span class="tag" style="background:#f59e0b">สินค้าใหม่</span>';
+var s=m?'<span class="tag" style="background:#1fb58a">จับคู่ด้วย '+m.how+"</span><br>":'<span class="tag" style="background:#7c5cd6">จับคู่ด้วยสินค้ากลาง</span><br>';
+s+=mine?"เคยเสนอ "+fm(mine.price)+" "+esc(mine.cur)+" ("+fd(mine.date)+")"+(isNaN(pr)?"":" → "+delta({price:pr,cur:cur},mine)):'<span class="mut">Supplier นี้ยังไม่เคยเสนอสินค้านี้</span>';
+if(oth)s+='<br><span class="mut">Supplier อื่นที่ถูกสุด: '+esc(oth.sup)+" "+fm(oth.price)+" ("+fd(oth.date)+")"+(isNaN(pr)||!oth.price?"":" · ราคานี้"+(pr<oth.price?"ถูกกว่า ":"แพงกว่า ")+Math.abs((pr-oth.price)/oth.price*100).toFixed(1)+"%")+"</span>";
+return s}
+function autoStdAll(){var pool=[],n=0;D.quotes.forEach(function(q){if(q.std&&pool.indexOf(q.std)<0)pool.push(q.std)});
+var todo=D.quotes.filter(function(q){return!q.std});todo.forEach(function(q){var s=suggestStd(q,pool);if(s){q.std=s;n++;if(pool.indexOf(s)<0)pool.push(s)}});
+if(!n){alert("ไม่พบรายการที่ระบุขนาดได้ (ชื่อสินค้าต้องมีขนาดแบบ กว้างxยาวxหนา)");return}
+if(!confirm("จะกำหนด 'สินค้ากลาง' ให้ "+n+" รายการ ตามขนาด (คลาดเคลื่อนไม่เกิน 3 มม.) และเกรด H/U ดำเนินการต่อหรือไม่?")){todo.forEach(function(q){delete q.std});return}
+save();go("quo")}
 boot();
 </script></body></html>
