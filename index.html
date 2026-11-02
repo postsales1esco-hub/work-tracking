@@ -77,7 +77,7 @@ async function exp(w){var m=document.getElementById("msg"),dl=null;try{dl=await 
 if(!dl){m.textContent="ไม่สามารถดาวน์โหลดไฟล์ในเวอร์ชันนี้ได้";return}
 var wb=XLSX.utils.book_new();
 if(w!="prs")XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(D.tasks.map(function(x){return{"Job ID":x.id,"งาน":x.t,"รายละเอียด":x.desc,"ลูกค้า/แผนก":x.cust,"ผู้รับผิดชอบ":x.a,"Priority":PRI[x.pri],"Start":x.start,"Due":x.d,"ความคืบหน้า %":x.p,"สถานะ":WS[x.st],"Linked PR":x.prs.join(", "),"Work Tasks":x.wt.map(function(t){return(t.done?"[x] ":"[ ] ")+t.t}).join(" | "),"เกินกำหนด":isLate(x)?"ใช่":"","บันทึกติดตาม":x.notes.map(function(n){return n.d+" "+n.by+": "+n.txt}).join(" | ")}})),"Work");
-if(w!="tasks")XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(D.prs.map(function(r){return{"PR No":r.pr,"รายการ":r.item,"จำนวน":r.qty,"ผู้ขอ":r.req,"วันที่ PR":r.date,"PO No":r.po,"ซัพพลายเออร์":r.sup,"ETA":r.eta,"สถานะ":ST[r.s],"Work Job":jobsOf(r.pr).map(function(q){return q.id}).join(", "),"Approval":(apr(r)||["-"])[0]}})),"PR-PO-Delivery");
+if(w!="tasks")XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(D.prs.map(function(r){return{"PR No":r.pr,"ประเภท":r.type||"Local","วันที่ PR":prDate(r)||"","รายการ":r.item,"จำนวน":r.qty,"ผู้ขอ":r.req,"วันที่ PR":r.date,"PO No":r.po,"ซัพพลายเออร์":r.sup,"ETA":r.eta,"สถานะ":ST[r.s],"Work Job":jobsOf(r.pr).map(function(q){return q.id}).join(", "),"Approval":(apr(r)||["-"])[0]}})),"PR-PO-Delivery");
 try{await dl.save({filename:"report-"+today()+".xlsx",data:new Blob([XLSX.write(wb,{type:"array",bookType:"xlsx"})])});m.textContent="ส่งออกแล้ว"}catch(e){m.textContent="ยกเลิกหรือบันทึกไม่สำเร็จ"}}
 var WS={O:"Open",I:"In Progress",H:"On Hold",C:"Completed",X:"Cancelled"},WC={O:"#8f9ac0",I:"#2f8fe8",H:"#f59e0b",C:"#1fb58a",X:"#e5484d"},PRI={H:"สูง",M:"กลาง",L:"ต่ำ"},PC={H:"#e5484d",M:"#f59e0b",L:"#1fb58a"},wsel=-1,wf="all";
 D.tasks.forEach(function(x,i){if(!x.id)x.id="JOB-"+String(i+1).padStart(4,"0");if(!x.st)x.st=x.p>=100?"C":x.p>0?"I":"O";x.pri=x.pri||"M";x.notes=x.notes||[];x.desc=x.desc||"";x.cust=x.cust||"";x.start=x.start||""});
@@ -101,13 +101,13 @@ D.hist=D.hist||[];
 var LB={pr:/pr\s*no/i,created:/creat/i,reqd:/request\s*date|req\.?\s*date/i,sales:/sales/i,dealer:/dealer/i,end:/end\s*user/i,obj:/objective/i,rem:/remark/i,prep:/prepared/i,chk:/checked/i,appr:/approved/i};
 var HN={pr:"PR No.",created:"Created Date",reqd:"Request Date",sales:"Sales Person in-charge",dealer:"Dealer Company Name",end:"End User Organization / Company",obj:"Objective",rem:"Remark",prep:"Prepared By",chk:"Checked By",appr:"Approved By"};
 var IC=[["model",/model/i],["code",/item\s*code|^code/i],["desc",/desc/i],["price",/unit\s*price/i],["total",/total/i],["sell",/selling/i],["cost",/cost/i],["margin",/margin/i],["disc",/disc/i],["cur",/curr/i],["qty",/qty|quantity/i],["unit",/^unit$/i],["sup",/supplier|company/i],["addr",/address/i],["no",/^item\s*no|^no\.?$|^item$|^#/i]];
-var IN={no:"Item No.",code:"Item Code",model:"Model Code",desc:"Description",unit:"Unit",qty:"Qty",price:"Unit Price",cur:"Currency",disc:"Discount %",total:"Total Price",sup:"Company / Supplier",sell:"Selling Price",cost:"Costing",margin:"% Margin",addr:"Delivery Address"};
+var IN={no:"Item No.",code:"Item Code",model:"Model Code",desc:"Description",unit:"Unit",qty:"Qty",price:"Unit Price",cur:"Currency",rate:"Rate (THB/SGD)",disc:"Discount %",total:"Total Price",sup:"Company / Supplier",sell:"Selling Price",cost:"Costing",margin:"% Margin",addr:"Delivery Address",extra:"รายละเอียดเพิ่มเติม"};
 function isLb(s){for(var k in LB)if(LB[k].test(s))return true;return false}
 function num(v){var n=parseFloat(String(v).replace(/[^0-9.\-]/g,""));return isNaN(n)?0:n}
 function cell(r,c){return String(r&&r[c]!=null?r[c]:"").trim()}
 function parseHdr(rows,name){var h={};
-for(var r=0;r<rows.length;r++)for(var c=0;c<rows[r].length;c++){var t=cell(rows[r],c);if(!t||t.length>60)continue;
-for(var k in LB){if(h[k]!==undefined||!LB[k].test(t))continue;var v="",i=t.indexOf(":");
+for(var r=0;r<rows.length;r++)for(var c=0;c<rows[r].length;c++){var t=cell(rows[r],c);if(!t)continue;var lb=t.indexOf(":")>=0?t.slice(0,t.indexOf(":")):t;if(lb.length>60)continue;
+for(var k in LB){if(h[k]!==undefined||!LB[k].test(lb))continue;var v="",i=t.indexOf(":");
 if(i>=0&&t.slice(i+1).trim()&&!isLb(t.slice(i+1)))v=t.slice(i+1).trim();
 if(!v)for(var j=c+1;j<rows[r].length;j++){var w=cell(rows[r],j);if(w){if(!isLb(w))v=w;break}}
 if(!v&&rows[r+1]){var w2=cell(rows[r+1],c);if(w2&&!isLb(w2))v=w2}
@@ -328,9 +328,9 @@ function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";if(v===
 async function api(action,data){var r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(Object.assign({},data||{},{action:action,token:TOKEN,by:USER?USER.name:""}))});var j=await r.json();if(j.error)throw new Error(j.error);return j}
 function fixAll(){["tasks","prs","quotes","hist"].forEach(function(c){D[c]=D[c]||[]});
 D.tasks.forEach(function(x){x.pri=x.pri||"M";x.notes=x.notes||[];x.desc=x.desc||"";x.cust=x.cust||"";x.start=x.start||"";x.prs=x.prs||[];x.wt=x.wt||[];if(!x.st)x.st=x.p>=100?"C":x.p>0?"I":"O"});
-D.quotes.forEach(function(q){q.prs=q.prs||[]});D.hist.sort(function(a,b){return(b.ts||0)-(a.ts||0)})}
+D.quotes.forEach(function(q){q.prs=q.prs||[]});fixPrs();D.hist.forEach(function(h){if(h.sk){delete h.sk;CLEAN.push(h.id)}});D.hist.sort(function(a,b){return(b.ts||0)-(a.ts||0)})}
 function snap(){Object.keys(KEY).forEach(function(c){SNAP[c]={};D[c].forEach(function(r){SNAP[c][KEY[c](r)]=JSON.stringify(r)})})}
-function apply(d){D.tasks=d.tasks||[];D.prs=d.prs||[];D.quotes=d.quotes||[];D.hist=d.hist||[];fixAll();snap();LAST=JSON.stringify(d)}
+function apply(d){D.tasks=d.tasks||[];D.prs=d.prs||[];D.quotes=d.quotes||[];D.hist=d.hist||[];fixAll();snap();CLEAN.forEach(function(id){SNAP.hist[id]="?"});var cl=CLEAN.length;CLEAN=[];LAST=JSON.stringify(d);if(cl)setTimeout(save,0)}
 function save(){D.hist.forEach(function(h){if(!h.id)h.id="H"+Date.now()+Math.random().toString(36).slice(2,6)});
 Object.keys(KEY).forEach(function(c){var seen={};D[c].forEach(function(r){var k=KEY[c](r),j=JSON.stringify(r);seen[k]=1;if(SNAP[c][k]!==j){enq({action:"upsert",col:c,rec:r,create:SNAP[c][k]===undefined});SNAP[c][k]=j}});
 Object.keys(SNAP[c]).forEach(function(k){if(!seen[k]){enq({action:"remove",col:c,id:k});delete SNAP[c][k]}})})}
@@ -438,5 +438,55 @@ var todo=D.quotes.filter(function(q){return!q.std});todo.forEach(function(q){var
 if(!n){alert("ไม่พบรายการที่ระบุขนาดได้ (ชื่อสินค้าต้องมีขนาดแบบ กว้างxยาวxหนา)");return}
 if(!confirm("จะกำหนด 'สินค้ากลาง' ให้ "+n+" รายการ ตามขนาด (คลาดเคลื่อนไม่เกิน 3 มม.) และเกรด H/U ดำเนินการต่อหรือไม่?")){todo.forEach(function(q){delete q.std});return}
 save();go("quo")}
+/* ===== PR: Local / Factory, วันที่ PR, ค้นหา, ประวัติ Import แบบย่อ ===== */
+var prq="",prT="",prS="",showAllSh=false,CLEAN=[];
+function pad2(x){return("0"+x).slice(-2)}
+function normDate(s){if(!s)return"";s=String(s).trim();var m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+"-"+pad2(m[2])+"-"+pad2(m[3]);
+m=s.match(/^(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{2,4})/);if(!m)return"";var a=+m[1],b=+m[2],y=+m[3];if(y<100)y+=2000;if(y>2400)y-=543;
+var d=a,mo=b;if(a<=12&&b>12){d=b;mo=a}if(mo>12||mo<1||d>31||d<1)return"";return y+"-"+pad2(mo)+"-"+pad2(d)}
+function prDate(r){return r.pdate||normDate(r.date)||normDate(r.hdr&&r.hdr.created)}
+function needBy(r){var q=r.hdr&&r.hdr.reqd;if(!q)return"";var n=String(q).match(/(\d+)\s*(?:day|วัน)/i),pd=prDate(r);if(n&&pd)return addDays(pd,+n[1]);return normDate(q)}
+function prType(pr,pc){return/^F/i.test(pr)?"Factory":/^L/i.test(pr)?"Local":(pc=="SGD"?"Factory":"Local")}
+function parseItems2(rows){var hr=-1,map={},out=[];
+for(var r=0;r<rows.length&&hr<0;r++){var m={},n=0;for(var c=0;c<rows[r].length;c++){var t=cell(rows[r],c);if(!t)continue;for(var q=0;q<IC.length;q++){var key=IC[q][0];if(m[key]===undefined&&IC[q][1].test(t)){m[key]=c;n++;break}}}if(n>=4&&(m.desc!==undefined||m.qty!==undefined)){hr=r;map=m}}
+if(hr<0)return out;var pm=map.price!==undefined?cell(rows[hr],map.price).match(/\b([A-Z]{3})\b/):null;out.pcur=pm?pm[1]:"";
+for(var r2=hr+1;r2<rows.length;r2++){if(/sub\s*total|grand\s*total|\bvat\b/i.test(rows[r2].join(" ")))break;var it={};for(var k in map)it[k]=cell(rows[r2],map[k]);
+var qn=parseFloat(String(it.qty).replace(/,/g,""));
+if((it.desc||it.code)&&it.qty&&isFinite(qn)){if(!it.total)it.total=String(num(it.qty)*num(it.price)*(1-num(it.disc)/100));out.push(it)}
+else if(it.desc&&!it.qty&&out.length){var l=out[out.length-1];l.extra=((l.extra?l.extra+" | ":"")+it.desc.replace(/\s*\n\s*/g," · ")).slice(0,400)}}
+return out}
+function fixItems(it,type){it.forEach(function(i){var c=String(i.cur||"").trim();if(/^[A-Za-z]{3}$/.test(c))i.cur=c.toUpperCase();else{var n=parseFloat(c.replace(/,/g,""));if(n>0)i.rate=String(n);i.cur=it.pcur||(type=="Factory"?"SGD":"THB")}})}
+function rateOf(it){for(var i=0;i<it.length;i++)if(it[i].rate)return it[i].rate;return""}
+function fixPrs(){D.prs.forEach(function(r){if(!r.type){var c=r.items&&r.items[0]&&/^[A-Za-z]{3}$/.test(r.items[0].cur||"")?r.items[0].cur:"";r.type=prType(r.pr,c)}
+if(r.items){fixItems(r.items,r.type);r.rate=r.rate||rateOf(r.items)}r.pdate=r.pdate||normDate(r.date)||normDate(r.hdr&&r.hdr.created)})}
+function valOf(it,rate){if(!it||!it.length)return"-";var thb=0,has=false;it.forEach(function(i){if(i.cur=="SGD"){var rt=num(i.rate)||num(rate);if(rt){thb+=num(i.total)*rt;has=true}}});
+return sumCur(it)+(has?'<br><span class="mut">≈ THB '+fm(thb)+" (@"+fm(num(rate)||num(rateOf(it)))+")</span>":"")}
+function parseWb(wb,file){var seen={},sh=wb.SheetNames.map(function(n){var rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:""}),h=parseHdr(rows,n),it=parseItems2(rows),type=prType(h.pr,it.pcur),k=String(h.pr).toLowerCase(),d=dupe(h.pr),inf=!!seen[k];seen[k]=1;fixItems(it,type);
+var s={name:n,pr:h.pr,hdr:h,items:it,dup:d,infile:inf,type:type,rate:rateOf(it)};s.ok=it.length>0&&!d&&!inf;s.sel=s.ok;return s});return{file:file,sheets:sh}}
+function mk(s){var it=s.items;return{pr:s.pr,type:s.type,rate:s.rate||"",pdate:normDate(s.hdr.created),item:(it[0].desc||it[0].code)+(it.length>1?" (+"+(it.length-1)+")":""),qty:it.reduce(function(a,i){return a+num(i.qty)},0),req:s.hdr.sales||"",date:s.hdr.created||"",s:"PR",po:"",sup:"",eta:"",hdr:s.hdr,items:it,src:imp.file}}
+function doImp(){var u=uname.trim();if(!u){alert("กรุณาระบุชื่อผู้ใช้งานก่อน Import");return}
+var ok=[];imp.sheets.forEach(function(s){if(s.sel&&s.ok){D.prs.push(mk(s));ok.push(s.pr)}});
+if(!ok.length){alert("ยังไม่ได้เลือก Sheet ที่ Import ได้");return}
+D.hist.unshift({ts:Date.now(),at:new Date().toLocaleString("th-TH"),user:u,file:imp.file,ok:ok});save();imp=null;prv=null;go("pr")}
+function setPrT(i,v){D.prs[i].type=v;save();go("pr")}
+function prTag(t){return'<span class="tag" style="background:'+(t=="Factory"?"#7c5cd6":"#2f8fe8")+'">'+esc(t||"Local")+"</span>"}
+function ago(d){if(!d)return"";var n=-dd(d);return n<=0?(n==0?"วันนี้":""):n+" วันที่แล้ว"}
+function prHay(r){var it=r.items||[],h=r.hdr||{};return[r.pr,r.item,r.req,r.type,h.sales,h.end,h.dealer,h.obj,h.rem].concat(it.map(function(i){return[i.code,i.model,i.desc,i.sup,i.extra].join(" ")})).join(" ").toLowerCase()}
+V.pr=function(){var h=head("PR Management","Import PR จาก Excel (Local / Factory) และติดตามสถานะ");
+h+='<div class="box"><div class="row"><input placeholder="ชื่อผู้ใช้งาน (ผู้ Import)" value="'+esc(uname)+'" oninput="uname=this.value;try{localStorage.setItem(\'wpts_u\',uname)}catch(e){}"><input type="file" id="xf2" accept=".xlsx,.xlsm,.xls"></div>';
+if(imp){var n=imp.sheets.filter(function(s){return s.sel}).length,vis=imp.sheets.map(function(s,i){return i}).filter(function(i){var s=imp.sheets[i];return showAllSh||s.items.length||s.dup}),hid=imp.sheets.length-vis.length;
+h+='<p class="mut">ไฟล์: '+esc(imp.file)+" · พบ "+imp.sheets.length+" Sheet"+(hid?" · ซ่อน "+hid+' Sheet ที่ไม่พบรายการสินค้า (แบบฟอร์มว่าง) <a href="#" onclick="showAllSh=!showAllSh;go(\'pr\');return false">'+(showAllSh?"ซ่อน":"แสดงทั้งหมด")+"</a>":"")+'</p><div class="row"><button class="b g" onclick="selAll(true)">Select All</button><button class="b g" onclick="selAll(false)">Clear Selection</button><button class="b" onclick="doImp()">Import ที่เลือก ('+n+')</button><button class="b g" onclick="imp=null;prv=null;go(\'pr\')">ยกเลิก</button></div><div class="tw"><table><tr><th></th><th>Sheet</th><th>PR No.</th><th>ประเภท</th><th>Sales Person</th><th>End User</th><th>รายการ</th><th>มูลค่ารวม</th><th>ตรวจสอบ</th><th></th></tr>'+
+vis.map(function(i){var s=imp.sheets[i],st=s.dup?'<span class="late">PR No. ซ้ำกับที่มีในระบบ</span>':s.infile?'<span class="late">PR No. ซ้ำในไฟล์</span>':!s.items.length?'<span class="late">ไม่พบรายการสินค้า</span>':'<span style="color:#1fb58a">พร้อม Import</span>';
+return'<tr><td><input type="checkbox"'+(s.sel?" checked":"")+(s.ok?"":" disabled")+' onchange="imp.sheets['+i+'].sel=this.checked;go(\'pr\')"></td><td>'+esc(s.name)+"</td><td>"+esc(s.pr)+'</td><td><select onchange="imp.sheets['+i+'].type=this.value;go(\'pr\')">'+opts({Local:"Local",Factory:"Factory"},s.type)+"</select></td><td>"+esc(s.hdr.sales)+"</td><td>"+esc(s.hdr.end)+"</td><td>"+s.items.length+"</td><td>"+valOf(s.items,s.rate)+"</td><td>"+st+'</td><td><button class="b g" onclick="prv={k:\'imp\',i:'+i+'};go(\'pr\')">Preview</button></td></tr>'}).join("")+"</table></div>"}
+h+="</div>";
+if(prv){if(prv.k=="imp"){var s2=imp.sheets[prv.i];h+=pvw(s2.hdr,s2.items,"Preview: "+esc(s2.pr)+" · "+esc(s2.type)+" (Sheet "+esc(s2.name)+")"+(s2.rate?" · Rate "+esc(s2.rate)+" THB/SGD":""))}else{var r0=D.prs[prv.i];h+=pvw(r0.hdr,r0.items,"รายละเอียด PR: "+esc(r0.pr)+" · "+esc(r0.type||"Local")+(r0.rate?" · Rate "+esc(r0.rate)+" THB/SGD":""))}}
+var t=prq.trim().toLowerCase(),L=D.prs.map(function(r,i){return i}).filter(function(i){var r=D.prs[i];return(!t||prHay(r).indexOf(t)>=0)&&(!prT||(r.type||"Local")==prT)&&(!prS||r.s==prS)});
+L.sort(function(a,b){return(prDate(D.prs[b])||"0")<(prDate(D.prs[a])||"0")?-1:1});
+h+='<div class="box"><h3>PR ในระบบ</h3><div class="row"><input id="prsearch" placeholder="ค้นหา PR No., รายการ, Item Code, Sales, End User, Supplier" style="flex:1;min-width:240px" value="'+esc(prq)+'" oninput="prq=this.value;go(\'pr\');var e=document.getElementById(\'prsearch\');e.focus();e.setSelectionRange(e.value.length,e.value.length)"><select onchange="prT=this.value;go(\'pr\')">'+opts({"":"ทุกประเภท",Local:"Local",Factory:"Factory"},prT)+'</select><select onchange="prS=this.value;go(\'pr\')">'+opts(Object.assign({"":"ทุกสถานะ"},ST),prS)+'</select><button class="b g" onclick="prq=\'\';prT=\'\';prS=\'\';go(\'pr\')">ล้างตัวกรอง</button><span class="mut">แสดง '+L.length+" จาก "+D.prs.length+'</span></div><div class="tw"><table style="min-width:1250px"><tr><th>วันที่ PR</th><th>PR No.</th><th>ประเภท</th><th>รายการ</th><th>Sales / ผู้ขอ</th><th>End User</th><th>จำนวนรายการ</th><th>มูลค่ารวม</th><th>ต้องการภายใน</th><th>Work Job</th><th>ใบเสนอราคา</th><th>สถานะ</th><th></th></tr>'+
+(L.length?L.map(function(i){var r=D.prs[i],it=r.items||[],pd=prDate(r),nb=needBy(r),late=nb&&r.s!="DL"&&nb<today();
+return"<tr><td>"+(pd?fd(pd)+'<br><span class="mut">'+ago(pd)+"</span>":'<span class="mut">-</span>')+"</td><td>"+esc(r.pr)+'</td><td><select onchange="setPrT('+i+',this.value)">'+opts({Local:"Local",Factory:"Factory"},r.type||"Local")+"</select></td><td>"+esc(r.item)+"</td><td>"+esc(r.req)+"</td><td>"+esc(r.hdr?r.hdr.end:"")+"</td><td>"+(it.length||"-")+"</td><td>"+valOf(it,r.rate)+'</td><td class="'+(late?"late":"")+'">'+(nb?fd(nb)+(late?"<br>เลยกำหนด":""):'<span class="mut">-</span>')+"</td><td>"+jobCell(r.pr,i)+"</td><td>"+quoCell(r.pr)+'</td><td><select onchange="D.prs['+i+'].s=this.value;save();go(\'pr\')">'+opts(ST,r.s)+'</select></td><td style="white-space:nowrap"><button class="b g" onclick="prv={k:\'db\',i:'+i+'};go(\'pr\')">รายละเอียด</button> <button class="b g" onclick="if(confirm(\'ลบ PR นี้?\')){unlinkAll(D.prs['+i+'].pr);D.prs.splice('+i+',1);prv=null;save();go(\'pr\')}">ลบ</button></td></tr>'}).join(""):'<tr><td colspan="13" class="mut">ไม่พบ PR</td></tr>')+"</table></div></div>";
+h+='<div class="box"><h3>ประวัติการ Import</h3><div class="tw"><table><tr><th>วัน-เวลา</th><th>ผู้ใช้งาน</th><th>ไฟล์</th><th>Import แล้ว</th></tr>'+
+(D.hist.length?D.hist.slice(0,30).map(function(x){return"<tr><td>"+esc(x.at)+"</td><td>"+esc(x.user)+"</td><td>"+esc(x.file)+"</td><td>"+esc((x.ok||[]).join(", "))+"</td></tr>"}).join(""):'<tr><td colspan="4" class="mut">ยังไม่มีประวัติ</td></tr>')+"</table></div></div>";
+return h};
 boot();
 </script></body></html>
